@@ -1,0 +1,221 @@
+///||||||||||||GROUND0||||||||||||||||||||||||||||||||||||||||||
+#include <LiquidCrystal.h>
+
+byte plane_body [] = {
+B10110,  
+B10011,  
+B11111, 
+B11111,  
+B11111,  
+B11111,  
+B10011,  
+B10110};
+
+byte plane_head [] = {
+B11111,  
+B01100,  
+B11110, 
+B11111,  
+B11111,  
+B11110,  
+B01100,  
+B11111};
+
+byte enemy [] = {
+B11000,  
+B01111,  
+B11010, 
+B11111,  
+B11111,  
+B11010,  
+B01111,  
+B11000};
+
+
+///|||||||||||||DECLARACAO||||||||||||||||||||||||||||||||||||||
+
+#define down_button  10
+#define up_button    9
+#define pin_contraste  12
+#define pin_rw         10
+#define vazio ' '
+int tempo = 400;
+
+///LCD(regselect, enable, data4, data5, data6, data7)
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+int posicao = 1;
+
+bool colisao = false;
+
+int dificuldade = 0;
+
+enum estados {
+  tela_inicial,
+  jogando,
+  gameover
+};
+
+int estado = tela_inicial;
+
+int verifica_estado(){
+  if (colisao){
+    return estado = gameover;
+  }
+}
+
+///|||||||||||||SETUP|||||||||||||||||||||||||||||||||||||||||||
+void setup(){
+  config_portas();
+}
+
+///|||||||||||||LOOP||||||||||||||||||||||||||||||||||||||||||||
+void loop(){
+  switch (estado){
+    case tela_inicial:
+      Serial.println("Tela Inicial");
+      telainicial();
+      break;
+    case jogando:
+      Serial.println("Jogando");
+      lcd.clear();
+      jogo();
+      break;
+    case gameover:
+      Serial.println("Game Over");
+      lcd.setCursor(2,1);
+      game_over();
+      break;
+  }
+}
+
+///|||||||||||||||FUNCOES|||||||||||||||||||||||||||||||||||||||
+int game_over(){
+  lcd.clear();
+  lcd.setCursor(4,1);
+  lcd.write("YOU LOSE!");
+  for (int x = 1; x <= 16; x++){
+    lcd.setCursor(x,0);
+    lcd.write(byte(2));
+    delay(150);
+    update_pixel(x,0);
+  }
+  for (int x = 16; x >= 0; x--){
+    lcd.setCursor(x,0);
+    lcd.write(byte(2));
+    delay(150);
+  }
+  while (estado != tela_inicial){
+    if((digitalRead(up_button) == LOW) or (digitalRead(down_button) == LOW)){
+      return estado = tela_inicial;
+    }
+  }
+}
+
+int telainicial(){
+  lcd.clear();
+  delay(500);
+  colisao = false;
+  dificuldade = 0;
+
+  lcd.setCursor(2,1);
+  lcd.write("PRESS START!");
+  int j = 1;
+  while (estado != jogando){
+
+    lcd.setCursor(j,0);
+    lcd.write(byte(1));
+    lcd.setCursor(j+1,0);
+    lcd.write(byte(0));
+    lcd.setCursor(j-1,0);
+    lcd.write(byte(vazio));
+    j++;
+    if (j == 17){
+      j = 1;
+    }
+    if(digitalRead(up_button) == LOW){
+      estado = jogando;
+    }
+    if(digitalRead(down_button) == LOW){
+      estado = jogando;
+    }
+  delay(200);
+  }
+  delay(500);
+  lcd.clear();
+  lcd.setCursor(3,0);
+  lcd.write("DIFFICULTY");
+  lcd.setCursor(0,1);
+  lcd.write("<- Easy");
+  lcd.setCursor(9,1);
+  lcd.write("Hard ->");
+
+  
+  while (dificuldade == 0){
+    if(digitalRead(up_button) == LOW){
+      dificuldade = 400;
+    }
+    if(digitalRead(down_button) == LOW){
+      dificuldade = 200;
+    }
+  }
+}
+  
+void update_pixel(int x, int y){ /// Após cada desenho
+  lcd.setCursor(x,y);            /// esta função apaga
+  lcd.write(vazio);              /// o espaço utilizado
+}
+
+void draw_ship(bool posicao_ship){
+  lcd.setCursor(0,posicao_ship);
+  lcd.write(byte(1));
+  lcd.setCursor(1,posicao_ship);
+  lcd.write(byte(0)); 
+  
+  update_pixel(0,not posicao_ship);
+  update_pixel(1,not posicao_ship);
+}
+
+void jogo(){
+  while(colisao == false){
+    int y = random(0,2);
+    for (x = 16; x >= 1; x--){
+      lcd.setCursor(x,y);
+      lcd.write(byte(2));
+      delay(dificuldade);
+      update_pixel(x,y);
+    
+      if (x == 2 and y == posicao){
+          colisao = true;
+          estado = gameover;
+      }
+      draw_ship(check_buttons());
+    }
+  }
+}
+
+int check_buttons(){
+  if(digitalRead(up_button) == LOW){
+    posicao = 1;
+  }
+  if(digitalRead(down_button) == LOW){
+    posicao = 0;
+  }
+  return posicao;
+}
+
+void config_portas(){
+  Serial.begin(9000);
+  lcd.begin(16,2);
+  lcd.clear();
+  
+  pinMode(pin_contraste,      OUTPUT);
+  digitalWrite(pin_contraste, LOW);
+  
+  digitalWrite(up_button,     INPUT_PULLUP);
+  digitalWrite(down_button,   INPUT_PULLUP);
+  
+  lcd.createChar(0, plane_head);
+  lcd.createChar(1, plane_body);
+  lcd.createChar(2, enemy);
+}
